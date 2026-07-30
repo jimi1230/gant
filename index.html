@@ -1,0 +1,2073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>甘特图生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --text-scale: 1;
+  }
+  [data-fontsize="sm"]{ --text-scale: 0.85; }
+  [data-fontsize="md"]{ --text-scale: 1; }
+  [data-fontsize="lg"]{ --text-scale: 1.15; }
+  :root, [data-theme="macaron"]{
+    --bg:#FAF7F6;
+    --sidebar-bg:#F3EBEC;
+    --card-bg:#FFFFFF;
+    --border:#E7DCDF;
+    --text:#5C5457;
+    --text-light:#A398A0;
+    --text-lighter:#CFC5CA;
+    --shadow: 0 4px 16px rgba(120,100,110,0.08);
+    --shadow-strong: 0 8px 24px rgba(120,100,110,0.16);
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+
+    --heading:#6D5D66;
+    --heading-soft:#8C7B82;
+    --brand-heading:#786670;
+    --accent:#C3A6B5;
+    --accent-border:#D3B7C1;
+    --accent-top:#E9CFD7;
+    --accent-bottom:#DCB6C1;
+    --accent-text:#6D4C56;
+    --danger:#BD8393;
+    --danger-bg: rgba(224,100,138,0.1);
+    --grid-line:#EFE7EA;
+    --scrollbar-thumb:#DFCFD4;
+    --scrollbar-thumb-hover:#CFB6BF;
+    --weekend-text:#C4A6AF;
+    --weekend-bg: rgba(255,182,200,0.06);
+    --dashed-btn-text:#A8949E;
+    --bar-radius: 17px;
+    --bar-shadow: 0 3px 8px rgba(120,80,100,0.15), inset 0 1px 0 rgba(255,255,255,0.6);
+    --bar-shadow-hover: 0 4px 12px rgba(120,80,100,0.22), inset 0 1px 0 rgba(255,255,255,0.6);
+    --bar-shadow-drag: 0 6px 16px rgba(120,80,100,0.3);
+    --bar-border: none;
+    --excel-header-bg:#F3E2EA;
+    --excel-header-text:#6D5D66;
+    --excel-border:#E7DCDF;
+    --excel-stripe:#FBF3F6;
+  }
+  [data-theme="office"]{
+    --bg:#FFFFFF;
+    --sidebar-bg:#F5F6F8;
+    --card-bg:#FFFFFF;
+    --border:#D9DEE3;
+    --text:#1F2937;
+    --text-light:#6B7280;
+    --text-lighter:#9CA3AF;
+    --shadow: 0 1px 4px rgba(15,23,42,0.06);
+    --shadow-strong: 0 6px 18px rgba(15,23,42,0.14);
+    --radius-lg: 6px;
+    --radius-md: 4px;
+    --radius-sm: 3px;
+
+    --heading:#1F2937;
+    --heading-soft:#374151;
+    --brand-heading:#111827;
+    --accent:#2563EB;
+    --accent-border:#2563EB;
+    --accent-top:#2563EB;
+    --accent-bottom:#1D4ED8;
+    --accent-text:#FFFFFF;
+    --danger:#DC2626;
+    --danger-bg: rgba(220,38,38,0.1);
+    --grid-line:#E5E7EB;
+    --scrollbar-thumb:#CBD5E1;
+    --scrollbar-thumb-hover:#94A3B8;
+    --weekend-text:#DC2626;
+    --weekend-bg: rgba(220,38,38,0.05);
+    --dashed-btn-text:#2563EB;
+    --bar-radius: 2px;
+    --bar-shadow: none;
+    --bar-shadow-hover: 0 0 0 2px rgba(37,99,235,0.25);
+    --bar-shadow-drag: 0 0 0 2px rgba(37,99,235,0.4);
+    --bar-border: 1px solid rgba(0,0,0,0.18);
+    --excel-header-bg:#1F3B57;
+    --excel-header-text:#FFFFFF;
+    --excel-border:#D1D5DB;
+    --excel-stripe:#F3F6FA;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3, .display{
+    font-family:'Baloo 2', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-weight:600;
+  }
+  #app{
+    display:flex;
+    height:100vh;
+    overflow:hidden;
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    width:280px;
+    min-width:280px;
+    background: var(--sidebar-bg);
+    border-right:1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    padding:24px 18px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:16px;
+    padding-left:4px;
+  }
+  .brand-macaron{
+    font-size: calc(28px * var(--text-scale));
+    line-height:1;
+  }
+  .brand h1{
+    font-size: calc(20px * var(--text-scale));
+    margin:0;
+    color: var(--brand-heading);
+  }
+  #theme-switch{
+    display:flex;
+    gap:6px;
+    margin-bottom:20px;
+  }
+  .theme-btn{
+    flex:1;
+    padding:8px 4px;
+    border-radius: var(--radius-sm);
+    border:1.5px solid var(--border);
+    background:#fff;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(12px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-light);
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .theme-btn.active{
+    background: var(--heading);
+    border-color: var(--heading);
+    color:#fff;
+  }
+  #fontsize-switch{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    margin-bottom:18px;
+    padding-left:2px;
+  }
+  .fontsize-label{
+    font-size: calc(11.5px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-light);
+    margin-right:2px;
+  }
+  .fontsize-btn{
+    flex:1;
+    padding:6px 0;
+    border-radius: var(--radius-sm);
+    border:1.5px solid var(--border);
+    background:#fff;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(12px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-light);
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .fontsize-btn.active{
+    background: var(--heading);
+    border-color: var(--heading);
+    color:#fff;
+  }
+  #project-list{
+    flex:1;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    padding-right:2px;
+  }
+  .project-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 12px;
+    border-radius: var(--radius-md);
+    cursor:pointer;
+    background:transparent;
+    border:2px solid transparent;
+    transition: all .15s ease;
+    position:relative;
+  }
+  .project-item:hover{
+    background: rgba(255,255,255,0.7);
+  }
+  .project-item.active{
+    background: var(--card-bg);
+    border-color: var(--dot-color, #FFB6C8);
+    box-shadow: var(--shadow);
+  }
+  .project-dot{
+    width:16px; height:16px;
+    border-radius:50%;
+    flex-shrink:0;
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .project-name{
+    flex:1;
+    font-weight:600;
+    font-size: calc(14.5px * var(--text-scale));
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .project-count{
+    font-size: calc(11.5px * var(--text-scale));
+    color: var(--text-light);
+    background: rgba(0,0,0,0.04);
+    padding:2px 7px;
+    border-radius:8px;
+  }
+  .project-del{
+    opacity:0;
+    background:none;
+    border:none;
+    color:var(--text-lighter);
+    cursor:pointer;
+    font-size: calc(15px * var(--text-scale));
+    padding:2px 4px;
+    border-radius:6px;
+    transition: opacity .15s ease, color .15s ease, background .15s ease;
+  }
+  .project-item:hover .project-del{ opacity:1; }
+  .project-del:hover{ color:var(--danger); background: var(--danger-bg); }
+
+  #add-project-btn{
+    margin-top:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:12px;
+    border-radius: var(--radius-md);
+    border:2px dashed var(--border);
+    background:transparent;
+    color:var(--dashed-btn-text);
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-weight:700;
+    font-size: calc(14px * var(--text-scale));
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  #add-project-btn:hover{
+    background: rgba(255,255,255,0.6);
+    border-color:var(--accent-border);
+  }
+
+  /* ---------- Main ---------- */
+  #main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  #main-header{
+    padding:26px 34px 16px;
+    border-bottom:1px solid var(--border);
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  #project-title-dot{
+    width:22px;height:22px;border-radius:50%;
+    box-shadow: inset 0 -3px 4px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
+    flex-shrink:0;
+  }
+  #project-title{
+    font-size: calc(26px * var(--text-scale));
+    margin:0;
+    color:var(--heading);
+    outline:none;
+    border-bottom:2px solid transparent;
+    padding:2px 4px;
+    border-radius:6px;
+  }
+  #project-title:hover, #project-title:focus{
+    border-bottom:2px dashed var(--border);
+  }
+  .task-counter{
+    font-size: calc(13px * var(--text-scale));
+    color:var(--text-light);
+    background: var(--sidebar-bg);
+    padding:5px 12px;
+    border-radius:20px;
+    font-weight:600;
+  }
+
+  #task-form-wrap{
+    padding:18px 34px;
+    border-bottom:1px solid var(--border);
+    background: linear-gradient(180deg, #FFFDFE, #FFF9FC);
+  }
+  #task-form{
+    display:flex;
+    align-items:flex-end;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .field label{
+    font-size: calc(11.5px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-light);
+    letter-spacing:.3px;
+    padding-left:2px;
+  }
+  .field input[type=text], .field input[type=date]{
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(14px * var(--text-scale));
+    font-weight:600;
+    color:var(--text);
+    padding:9px 12px;
+    border-radius: var(--radius-sm);
+    border:1.5px solid var(--border);
+    background:#fff;
+    outline:none;
+    transition: border-color .15s ease;
+  }
+  .field input:focus{
+    border-color:var(--accent-border);
+  }
+  #task-name-input{ width:190px; }
+  #task-owner-input{ width:120px; }
+  #task-note-input{ width:190px; }
+
+  .col-toggle{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size: calc(12.5px * var(--text-scale));
+    font-weight:600;
+    color: var(--text-light);
+    cursor:pointer;
+    user-select:none;
+    padding:6px 10px;
+    border-radius:20px;
+    background: var(--sidebar-bg);
+  }
+  .col-toggle input{ accent-color:var(--accent); cursor:pointer; }
+
+  .scale-switch{
+    display:flex;
+    gap:3px;
+    background: var(--sidebar-bg);
+    padding:4px;
+    border-radius:20px;
+  }
+  .scale-btn{
+    border:none;
+    background:transparent;
+    padding:6px 14px;
+    border-radius:16px;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(12.5px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-light);
+    cursor:pointer;
+    transition: all .12s ease;
+  }
+  .scale-btn.active{
+    background:#fff;
+    color: var(--heading);
+    box-shadow: var(--shadow);
+  }
+
+  .backup-links{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px solid var(--border);
+  }
+  .backup-link-btn{
+    background:none;
+    border:none;
+    text-align:left;
+    padding:6px 4px;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(12.5px * var(--text-scale));
+    font-weight:600;
+    color:var(--heading-soft);
+    cursor:pointer;
+    border-radius:8px;
+  }
+  .backup-link-btn:hover{ background: rgba(255,255,255,0.6); color:var(--heading); }
+
+  .export-btn{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:9px 16px;
+    border-radius: var(--radius-sm);
+    border:1.5px solid var(--border);
+    background:#fff;
+    color:var(--heading);
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-weight:700;
+    font-size: calc(13.5px * var(--text-scale));
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .export-btn:hover{
+    background: var(--sidebar-bg);
+    border-color:var(--accent-border);
+  }
+  #export-wrap{
+    position:relative;
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  #export-menu{
+    position:absolute;
+    top:calc(100% + 6px);
+    right:0;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-strong);
+    display:none;
+    flex-direction:column;
+    min-width:140px;
+    overflow:hidden;
+    z-index:10;
+  }
+  #export-menu.show{ display:flex; }
+  #export-menu button{
+    padding:10px 14px;
+    border:none;
+    background:none;
+    text-align:left;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-weight:600;
+    font-size: calc(13.5px * var(--text-scale));
+    color:var(--text);
+    cursor:pointer;
+  }
+  #export-menu button:hover{ background: var(--sidebar-bg); }
+
+  .color-picker{
+    display:flex;
+    gap:6px;
+    padding:5px 2px;
+  }
+  .color-swatch{
+    width:24px;height:24px;
+    border-radius:50%;
+    cursor:pointer;
+    border:2px solid transparent;
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,0.08);
+    transition: transform .1s ease;
+  }
+  .color-swatch:hover{ transform: scale(1.12); }
+  .color-swatch.selected{
+    border-color:var(--heading);
+    transform: scale(1.15);
+  }
+
+  #add-task-btn{
+    padding:10px 22px;
+    border:none;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(180deg, var(--accent-top), var(--accent-bottom));
+    color:var(--accent-text);
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-weight:700;
+    font-size: calc(14px * var(--text-scale));
+    cursor:pointer;
+    box-shadow: 0 3px 8px rgba(170,140,150,0.25);
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  #add-task-btn:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(170,140,150,0.32);
+  }
+  #add-task-btn:active{ transform: translateY(0); }
+
+  /* ---------- Gantt ---------- */
+  #gantt-scroll{
+    flex:1;
+    overflow:auto;
+    padding: 20px 34px 40px;
+  }
+  #empty-state{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    color: var(--text-light);
+    text-align:center;
+    gap:10px;
+    padding-top:60px;
+  }
+  #empty-state .emoji{ font-size:44px; margin-bottom:6px; }
+  #empty-state h3{ color:var(--heading-soft); font-size: calc(19px * var(--text-scale)); margin:0; }
+  #empty-state p{ margin:0; font-size: calc(14px * var(--text-scale)); max-width:280px; }
+
+  #excel-section{
+    margin-top:32px;
+  }
+  .excel-header-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .excel-title{
+    font-size: calc(16px * var(--text-scale));
+    color: var(--heading);
+    margin:0;
+  }
+  #excel-table-wrap{
+    overflow-x:auto;
+    border:1px solid var(--excel-border);
+    border-radius: var(--radius-sm);
+  }
+  .excel-table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:520px;
+    font-size: calc(13px * var(--text-scale));
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+  }
+  .excel-table th{
+    background: var(--excel-header-bg);
+    color: var(--excel-header-text);
+    text-align:left;
+    padding:9px 14px;
+    border:1px solid var(--excel-border);
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .excel-table td{
+    padding:8px 14px;
+    border:1px solid var(--excel-border);
+    color:var(--text);
+    white-space:nowrap;
+  }
+  .excel-table tbody tr:nth-child(even) td{
+    background: var(--excel-stripe);
+  }
+  .excel-table td.excel-name-cell{
+    border-left-width:4px;
+    border-left-style:solid;
+    font-weight:600;
+  }
+  .excel-date-input{
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(12.5px * var(--text-scale));
+    font-weight:600;
+    color:var(--text);
+    border:1.5px solid transparent;
+    background:transparent;
+    border-radius:6px;
+    padding:3px 5px;
+    cursor:pointer;
+  }
+  .excel-date-input:hover{ border-color: var(--border); }
+  .excel-date-input:focus{ outline:none; border-color: var(--accent-border); background:#fff; }
+
+  #gantt-table{
+    display:inline-block;
+    min-width:100%;
+    position:relative;
+  }
+  #col-resize-handle{
+    position:absolute;
+    top:0;
+    width:7px;
+    margin-left:-3.5px;
+    cursor:col-resize;
+    z-index:6;
+  }
+  #col-resize-handle::after{
+    content:'';
+    position:absolute;
+    left:50%;
+    top:0;
+    bottom:0;
+    width:2px;
+    background: transparent;
+    transform: translateX(-50%);
+    transition: background .12s ease;
+  }
+  #col-resize-handle:hover::after, #col-resize-handle.resizing::after{
+    background: var(--accent-border);
+    width:3px;
+  }
+  .gantt-row-frame{
+    display:grid;
+    align-items:stretch;
+  }
+  .gantt-label-cell{
+    position:sticky;
+    left:0;
+    background: var(--bg);
+    z-index:3;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:0 10px 0 2px;
+    border-right:1px solid var(--border);
+  }
+  .gantt-owner-cell{
+    position:sticky;
+    background: var(--bg);
+    z-index:3;
+    display:flex;
+    align-items:center;
+    padding:0 10px;
+    border-right:1px solid var(--border);
+    font-size: calc(12.5px * var(--text-scale));
+    color: var(--text-light);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .gantt-note-cell{
+    background: var(--bg);
+    display:flex;
+    align-items:center;
+    padding:0 14px;
+    border-left:1px solid var(--border);
+    font-size: calc(12.5px * var(--text-scale));
+    color: var(--text-light);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .header-row .gantt-label-cell, .header-row .gantt-owner-cell, .header-row .gantt-note-cell{
+    background: var(--bg);
+    z-index:4;
+    align-items:flex-end;
+    padding-bottom:6px;
+    font-size: calc(11.5px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-lighter);
+  }
+  .month-band{
+    position:absolute;
+    top:3px;
+    left:3px;
+    font-size: calc(11px * var(--text-scale));
+    font-weight:700;
+    color:var(--heading-soft);
+    white-space:nowrap;
+  }
+  .day-header-cell{
+    position:relative;
+    font-size: calc(11px * var(--text-scale));
+    color: var(--text-lighter);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-end;
+    padding-bottom:6px;
+    font-weight:600;
+  }
+  .day-header-cell.weekend{ color:var(--weekend-text); }
+  .day-header-cell .dow{ font-size: calc(9px * var(--text-scale)); opacity:.8; }
+  .week-label{
+    font-size: calc(9.5px * var(--text-scale));
+    font-weight:700;
+    color: var(--text-lighter);
+    white-space:nowrap;
+  }
+  .day-track{
+    display:grid;
+    position:relative;
+  }
+  .day-cell-bg{
+    border-right:1px solid var(--grid-line);
+  }
+  .day-cell-bg.weekend{
+    background: var(--weekend-bg);
+  }
+  .task-row{
+    height:52px;
+    transition: opacity .12s ease;
+  }
+  .task-row .day-track{ height:52px; }
+  .task-row.row-dragging{ opacity:0.35; }
+  .task-row.row-drop-before .gantt-label-cell,
+  .task-row.row-drop-before .gantt-owner-cell,
+  .task-row.row-drop-before .gantt-note-cell{
+    box-shadow: inset 0 3px 0 0 var(--accent);
+  }
+  .task-row.row-drop-after .gantt-label-cell,
+  .task-row.row-drop-after .gantt-owner-cell,
+  .task-row.row-drop-after .gantt-note-cell{
+    box-shadow: inset 0 -3px 0 0 var(--accent);
+  }
+  .row-grip{
+    font-size: calc(13px * var(--text-scale));
+    line-height:1;
+    color: var(--text-lighter);
+    cursor:grab;
+    padding:0 1px;
+    user-select:none;
+    letter-spacing:-2px;
+    flex-shrink:0;
+  }
+  .row-grip:active{ cursor:grabbing; }
+  .task-row-label{
+    font-size: calc(13.5px * var(--text-scale));
+    font-weight:600;
+    color:var(--text);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    flex:1;
+    cursor:pointer;
+  }
+  .task-row-label:hover{ text-decoration: underline dotted; text-underline-offset:3px; }
+  .task-edit-btn, .task-del-btn{
+    opacity:0;
+    background:none;border:none;color:var(--text-lighter);
+    cursor:pointer; font-size: calc(13px * var(--text-scale)); padding:2px 5px; border-radius:5px;
+  }
+  .gantt-label-cell:hover .task-edit-btn, .gantt-label-cell:hover .task-del-btn{ opacity:1; }
+  .task-edit-btn:hover{ color:var(--heading-soft); background:rgba(140,123,130,0.12); }
+  .task-del-btn:hover{ color:var(--danger); background:var(--danger-bg); }
+
+  .macaron-bar{
+    position:absolute;
+    top:9px;
+    height:34px;
+    border-radius: var(--bar-radius);
+    border: var(--bar-border);
+    display:flex;
+    align-items:center;
+    padding:0 12px;
+    overflow:visible;
+    box-shadow: var(--bar-shadow);
+    cursor:grab;
+    transition: box-shadow .12s ease;
+    background: linear-gradient(180deg, var(--bar-top), var(--bar-bottom));
+  }
+  [data-theme="office"] .macaron-bar{
+    background: var(--bar-bottom);
+  }
+  .macaron-bar:hover{ box-shadow: var(--bar-shadow-hover); }
+  .macaron-bar.dragging{ cursor:grabbing; box-shadow: var(--bar-shadow-drag); z-index:5; }
+  .macaron-bar .filling-line{
+    position:absolute;
+    left:6px; right:6px; top:50%;
+    height:2px;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.55);
+    border-radius:2px;
+    pointer-events:none;
+  }
+  [data-theme="office"] .macaron-bar .filling-line{ display:none; }
+  .bar-handle{
+    position:absolute;
+    top:0;
+    width:9px;
+    height:100%;
+    cursor:ew-resize;
+    z-index:2;
+  }
+  .bar-handle-left{ left:0; border-radius: var(--bar-radius) 0 0 var(--bar-radius); }
+  .bar-handle-right{ right:0; border-radius: 0 var(--bar-radius) var(--bar-radius) 0; }
+  .bar-handle:hover{ background: rgba(255,255,255,0.35); }
+  [data-theme="office"] .bar-handle:hover{ background: rgba(255,255,255,0.2); }
+
+
+
+  ::-webkit-scrollbar{ height:10px; width:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:var(--scrollbar-thumb); border-radius:10px; }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--scrollbar-thumb-hover); }
+
+  /* Modal */
+  #modal-overlay, #task-modal-overlay{
+    position:fixed; inset:0;
+    background: rgba(90,60,75,0.28);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+  }
+  #modal-overlay.show, #task-modal-overlay.show{ display:flex; }
+  #modal-box, #task-modal-box{
+    background:#fff;
+    border-radius: var(--radius-lg);
+    padding:26px 26px 22px;
+    width:320px;
+    box-shadow: var(--shadow-strong);
+  }
+  #task-modal-box{ width:380px; }
+  #modal-box h3, #task-modal-box h3{ margin:0 0 16px; color:var(--heading); font-size: calc(18px * var(--text-scale)); }
+  #modal-box input, #task-modal-box input{
+    width:100%;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-size: calc(14px * var(--text-scale)); font-weight:600;
+    padding:10px 12px;
+    border-radius: var(--radius-sm);
+    border:1.5px solid var(--border);
+    outline:none;
+  }
+  #modal-box input{ margin-bottom:14px; }
+  #modal-box input:focus, #task-modal-box input:focus{ border-color:var(--accent-border); }
+  #modal-color-picker{ margin-bottom:18px; }
+  #task-modal-box .field label{ display:block; margin-bottom:5px; }
+  .modal-btns{ display:flex; gap:10px; justify-content:flex-end; }
+  .modal-btn{
+    padding:9px 18px;
+    border-radius: var(--radius-sm);
+    border:none;
+    font-family:'Quicksand', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+    font-weight:700;
+    font-size: calc(13.5px * var(--text-scale));
+    cursor:pointer;
+  }
+  .modal-btn.cancel{ background: var(--sidebar-bg); color:var(--text-light); }
+  .modal-btn.confirm{ background: linear-gradient(180deg, var(--accent-top), var(--accent-bottom)); color:var(--accent-text); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="brand">
+      <div class="brand-macaron" id="brand-emoji">🍬</div>
+      <h1>我的项目</h1>
+    </div>
+    <div id="theme-switch">
+      <button class="theme-btn" data-theme-btn="macaron">🍬 马卡龙风</button>
+      <button class="theme-btn" data-theme-btn="office">💼 办公风</button>
+    </div>
+    <div id="fontsize-switch">
+      <span class="fontsize-label">字号</span>
+      <button class="fontsize-btn" data-fontsize-btn="sm">小</button>
+      <button class="fontsize-btn" data-fontsize-btn="md">中</button>
+      <button class="fontsize-btn" data-fontsize-btn="lg">大</button>
+    </div>
+    <div id="project-list"></div>
+    <button id="add-project-btn">＋ 新建项目</button>
+    <div class="backup-links">
+      <button class="backup-link-btn" id="export-data-btn">💾 导出数据备份（.json）</button>
+      <button class="backup-link-btn" id="import-data-btn">📂 导入数据备份</button>
+      <input type="file" id="import-data-file" accept=".json" style="display:none;">
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="main-header">
+      <div id="project-title-dot"></div>
+      <h2 id="project-title" contenteditable="true" spellcheck="false"></h2>
+      <div id="export-wrap">
+        <div class="scale-switch" id="scale-switch">
+          <button class="scale-btn" data-scale="day">日</button>
+          <button class="scale-btn" data-scale="week">周</button>
+          <button class="scale-btn" data-scale="month">月</button>
+        </div>
+        <label class="col-toggle"><input type="checkbox" id="toggle-owner" checked> 负责人</label>
+        <label class="col-toggle"><input type="checkbox" id="toggle-note" checked> 备注</label>
+        <div class="task-counter" id="task-counter"></div>
+        <button class="export-btn" id="export-btn">📷 导出图片</button>
+        <div id="export-menu">
+          <button data-export="png">导出为 PNG</button>
+          <button data-export="jpg">导出为 JPG</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="task-form-wrap">
+      <div id="task-form">
+        <div class="field">
+          <label>事项名称</label>
+          <input type="text" id="task-name-input" placeholder="例如：需求调研">
+        </div>
+        <div class="field">
+          <label>负责人（选填）</label>
+          <input type="text" id="task-owner-input" placeholder="例如：张三">
+        </div>
+        <div class="field">
+          <label>开始日期</label>
+          <input type="date" id="task-start-input">
+        </div>
+        <div class="field">
+          <label>结束日期</label>
+          <input type="date" id="task-end-input">
+        </div>
+        <div class="field">
+          <label>颜色</label>
+          <div class="color-picker" id="task-color-picker"></div>
+        </div>
+        <div class="field">
+          <label>备注（选填）</label>
+          <input type="text" id="task-note-input" placeholder="例如：需客户确认">
+        </div>
+        <button id="add-task-btn">＋ 添加事项</button>
+      </div>
+    </div>
+
+    <div id="gantt-scroll">
+      <div id="empty-state">
+        <div class="emoji">🧁</div>
+        <h3>还没有事项</h3>
+        <p>在上方填写名称和日期，添加第一个事项，开始生成甘特图吧</p>
+      </div>
+      <div id="gantt-table" style="display:none;"></div>
+      <div id="excel-section" style="display:none;">
+        <div class="excel-header-row">
+          <h3 class="excel-title">项目管理表</h3>
+          <div style="display:flex; gap:8px;">
+            <button class="export-btn" id="export-excel-btn">📤 导出 Excel</button>
+            <button class="export-btn" id="import-excel-btn">📥 导入 Excel</button>
+            <input type="file" id="import-excel-file" accept=".xlsx,.xls,.csv" style="display:none;">
+          </div>
+        </div>
+        <div id="excel-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal-box">
+    <h3>新建项目</h3>
+    <input type="text" id="modal-project-name" placeholder="项目名称" maxlength="30">
+    <div class="color-picker" id="modal-color-picker"></div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" id="modal-cancel">取消</button>
+      <button class="modal-btn confirm" id="modal-confirm">创建</button>
+    </div>
+  </div>
+</div>
+
+<div id="task-modal-overlay">
+  <div id="task-modal-box">
+    <h3>编辑事项</h3>
+    <div class="field" style="margin-bottom:12px;">
+      <label>事项名称</label>
+      <input type="text" id="task-modal-name" placeholder="事项名称" maxlength="60">
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>负责人（选填）</label>
+      <input type="text" id="task-modal-owner" placeholder="例如：张三">
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom:12px;">
+      <div class="field" style="flex:1;">
+        <label>开始日期</label>
+        <input type="date" id="task-modal-start">
+      </div>
+      <div class="field" style="flex:1;">
+        <label>结束日期</label>
+        <input type="date" id="task-modal-end">
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>颜色</label>
+      <div class="color-picker" id="task-modal-color-picker"></div>
+    </div>
+    <div class="field" style="margin-bottom:18px;">
+      <label>备注（选填）</label>
+      <input type="text" id="task-modal-note" placeholder="备注">
+    </div>
+    <div class="modal-btns" style="justify-content:space-between;">
+      <button class="modal-btn cancel" id="task-modal-delete" style="color:var(--danger);">删除事项</button>
+      <div style="display:flex; gap:10px;">
+        <button class="modal-btn cancel" id="task-modal-cancel">取消</button>
+        <button class="modal-btn confirm" id="task-modal-save">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PALETTES = {
+    macaron: [
+      { name:'rose',      top:'#EAD1D9', bottom:'#D9AEBB' },
+      { name:'pistachio', top:'#D6E5DA', bottom:'#B3CDBC' },
+      { name:'vanilla',   top:'#EDE4C6', bottom:'#DACB94' },
+      { name:'lavender',  top:'#DDD4E2', bottom:'#C3B4D0' },
+      { name:'peach',     top:'#E9D6C8', bottom:'#D9B899' },
+      { name:'sky',       top:'#D2E1E5', bottom:'#AECBD1' },
+    ],
+    office: [
+      { name:'rose',      top:'#4A78B5', bottom:'#2F5D96' }, // blue
+      { name:'pistachio', top:'#3C4652', bottom:'#232B33' }, // black / charcoal
+      { name:'vanilla',   top:'#C1514F', bottom:'#9C3D3B' }, // red
+      { name:'lavender',  top:'#7C8896', bottom:'#5B6673' }, // gray
+      { name:'peach',     top:'#6FA0D8', bottom:'#4A7FBE' }, // light blue
+      { name:'sky',       top:'#445064', bottom:'#2B3444' }, // slate
+    ]
+  };
+  function currentPalette(){ return PALETTES[state.theme] || PALETTES.macaron; }
+
+  let state = {
+    projects: [],
+    selectedId: null,
+    showOwner: true,
+    showNote: true,
+    theme: 'macaron',
+    scale: 'day',
+    fontSize: 'md',
+    nameColWidth: 170
+  };
+
+  const SCALE_CONFIG = {
+    day:   { cellWidth: 34, showDayNumber: true,  weekStartLabel: false },
+    week:  { cellWidth: 14, showDayNumber: false, weekStartLabel: true  },
+    month: { cellWidth: 6,  showDayNumber: false, weekStartLabel: false }
+  };
+
+  const OWNER_W = 120, NOTE_W = 160;
+  const NAME_W_MIN = 100, NAME_W_MAX = 360;
+  const STORAGE_KEY = 'macaron-gantt-projects-v2';
+  const hasCloudStorage = (typeof window.storage !== 'undefined');
+  let hasLocalStorage = false;
+  try{ localStorage.setItem('__test__','1'); localStorage.removeItem('__test__'); hasLocalStorage = true; }catch(e){ hasLocalStorage = false; }
+
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+  function defaultProjects(){
+    return [];
+  }
+
+  function applyLoaded(parsed){
+    if(parsed && Array.isArray(parsed.projects)){
+      state.projects = parsed.projects;
+      state.selectedId = parsed.selectedId || (parsed.projects[0] && parsed.projects[0].id) || null;
+      state.showOwner = parsed.showOwner !== undefined ? parsed.showOwner : true;
+      state.showNote = parsed.showNote !== undefined ? parsed.showNote : true;
+      state.theme = parsed.theme === 'office' ? 'office' : 'macaron';
+      state.scale = ['day','week','month'].includes(parsed.scale) ? parsed.scale : 'day';
+      state.fontSize = ['sm','md','lg'].includes(parsed.fontSize) ? parsed.fontSize : 'md';
+      state.nameColWidth = (typeof parsed.nameColWidth === 'number') ? parsed.nameColWidth : 170;
+      return true;
+    }
+    return false;
+  }
+
+  async function loadState(){
+    // Two independent storage backends are tried because this file may run either
+    // as a Claude artifact (window.storage) or as a plain HTML file saved to disk
+    // and opened directly in a browser (localStorage). Whichever has data wins.
+    if(hasCloudStorage){
+      try{
+        const res = await window.storage.get(STORAGE_KEY, false);
+        if(res && res.value && applyLoaded(JSON.parse(res.value))) return;
+      }catch(e){ /* no saved data yet in cloud storage */ }
+    }
+    if(hasLocalStorage){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw && applyLoaded(JSON.parse(raw))) return;
+      }catch(e){ /* no saved data yet in local storage */ }
+    }
+    state.projects = defaultProjects();
+    state.selectedId = null;
+  }
+
+  async function saveState(){
+    const payload = JSON.stringify({
+      projects: state.projects,
+      selectedId: state.selectedId,
+      showOwner: state.showOwner,
+      showNote: state.showNote,
+      theme: state.theme,
+      scale: state.scale,
+      fontSize: state.fontSize,
+      nameColWidth: state.nameColWidth
+    });
+    if(hasCloudStorage){
+      try{ await window.storage.set(STORAGE_KEY, payload, false); }catch(e){ console.warn('云端保存失败', e); }
+    }
+    if(hasLocalStorage){
+      try{ localStorage.setItem(STORAGE_KEY, payload); }catch(e){ console.warn('本地保存失败', e); }
+    }
+  }
+
+  function downloadBackup(){
+    const payload = JSON.stringify({
+      projects: state.projects,
+      selectedId: state.selectedId,
+      showOwner: state.showOwner,
+      showNote: state.showNote,
+      theme: state.theme,
+      scale: state.scale,
+      fontSize: state.fontSize,
+      nameColWidth: state.nameColWidth
+    }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `甘特图数据备份-${fmtDate(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importBackupFromFile(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!applyLoaded(parsed)) throw new Error('格式不正确');
+        saveState();
+        applyTheme();
+        applyFontSize();
+        renderAll();
+      }catch(e){
+        alert('导入失败，请确认选择的是本工具导出的备份文件');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function getSelectedProject(){
+    return state.projects.find(p => p.id === state.selectedId) || null;
+  }
+
+  function applyTheme(){
+    document.documentElement.setAttribute('data-theme', state.theme);
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-theme-btn') === state.theme);
+    });
+  }
+
+  function applyFontSize(){
+    document.documentElement.setAttribute('data-fontsize', state.fontSize);
+    document.querySelectorAll('.fontsize-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-fontsize-btn') === state.fontSize);
+    });
+  }
+
+  // ---------- Rendering ----------
+
+  function renderColorPicker(container, selectedName, onSelect){
+    container.innerHTML = '';
+    currentPalette().forEach(c => {
+      const sw = document.createElement('div');
+      sw.className = 'color-swatch' + (c.name === selectedName ? ' selected' : '');
+      sw.style.background = `linear-gradient(180deg, ${c.top}, ${c.bottom})`;
+      sw.title = c.name;
+      sw.addEventListener('click', () => {
+        container.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+        onSelect(c.name);
+      });
+      container.appendChild(sw);
+    });
+  }
+
+  let newTaskColor = PALETTES.macaron[0].name;
+  let newProjectColor = PALETTES.macaron[0].name;
+  let editTaskColor = PALETTES.macaron[0].name;
+  let editingTaskId = null;
+
+  let ganttCellWidth = 34;
+  let ganttMinD = null;
+  let dragCtx = null;
+
+  function macaronOf(name){
+    const pal = currentPalette();
+    return pal.find(c => c.name === name) || pal[0];
+  }
+
+  function renderSidebar(){
+    const list = document.getElementById('project-list');
+    list.innerHTML = '';
+    state.projects.forEach(p => {
+      const item = document.createElement('div');
+      const c = macaronOf(p.color);
+      item.className = 'project-item' + (p.id === state.selectedId ? ' active' : '');
+      item.style.setProperty('--dot-color', c.bottom);
+      item.innerHTML = `
+        <div class="project-dot" style="background: linear-gradient(180deg, ${c.top}, ${c.bottom});"></div>
+        <div class="project-name">${escapeHtml(p.name)}</div>
+        <div class="project-count">${p.tasks.length}</div>
+        <button class="project-del" title="删除项目">✕</button>
+      `;
+      item.addEventListener('click', (e) => {
+        if(e.target.closest('.project-del')) return;
+        state.selectedId = p.id;
+        saveState();
+        renderAll();
+      });
+      item.querySelector('.project-del').addEventListener('click', () => {
+        if(confirm(`确定删除项目"${p.name}"吗？这将删除其中所有事项。`)){
+          state.projects = state.projects.filter(x => x.id !== p.id);
+          if(state.selectedId === p.id){
+            state.selectedId = state.projects[0] ? state.projects[0].id : null;
+          }
+          saveState();
+          renderAll();
+        }
+      });
+      list.appendChild(item);
+    });
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function fmtDate(d){
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  function parseDate(str){
+    const [y,m,d] = str.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  function addDays(d, n){
+    const nd = new Date(d);
+    nd.setDate(nd.getDate()+n);
+    return nd;
+  }
+  function dayDiff(a,b){
+    return Math.round((b - a) / 86400000);
+  }
+  const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const DOW_NAMES = ['日','一','二','三','四','五','六'];
+
+  function renderHeader(){
+    const proj = getSelectedProject();
+    const dot = document.getElementById('project-title-dot');
+    const title = document.getElementById('project-title');
+    const counter = document.getElementById('task-counter');
+    if(!proj){
+      dot.style.background = '#eee';
+      title.textContent = '';
+      title.setAttribute('contenteditable','false');
+      counter.textContent = '';
+      return;
+    }
+    const c = macaronOf(proj.color);
+    dot.style.background = `linear-gradient(180deg, ${c.top}, ${c.bottom})`;
+    title.textContent = proj.name;
+    title.setAttribute('contenteditable','true');
+    counter.textContent = `${proj.tasks.length} 个事项`;
+  }
+
+  function renderTaskFormColors(){
+    renderColorPicker(document.getElementById('task-color-picker'), newTaskColor, (name) => {
+      newTaskColor = name;
+    });
+  }
+
+  // ---------- Bar drag (move / resize) ----------
+
+  function onBarMouseDown(e){
+    e.preventDefault();
+    const bar = e.currentTarget;
+    const taskId = bar.getAttribute('data-task-id');
+    const proj = getSelectedProject();
+    const task = proj && proj.tasks.find(t => t.id === taskId);
+    if(!task) return;
+
+    let mode = 'move';
+    if(e.target.classList.contains('bar-handle-left')) mode = 'resize-left';
+    else if(e.target.classList.contains('bar-handle-right')) mode = 'resize-right';
+
+    dragCtx = {
+      taskId, mode,
+      startClientX: e.clientX,
+      origOffset: parseInt(bar.dataset.offset, 10),
+      origDuration: parseInt(bar.dataset.duration, 10),
+      moved: false,
+      barEl: bar
+    };
+    document.addEventListener('mousemove', onBarMouseMove);
+    document.addEventListener('mouseup', onBarMouseUp);
+    document.body.style.userSelect = 'none';
+  }
+
+  function onBarMouseMove(e){
+    if(!dragCtx) return;
+    const deltaPx = e.clientX - dragCtx.startClientX;
+    if(Math.abs(deltaPx) > 3) dragCtx.moved = true;
+    const deltaDays = Math.round(deltaPx / ganttCellWidth);
+
+    let newOffset = dragCtx.origOffset;
+    let newDuration = dragCtx.origDuration;
+
+    if(dragCtx.mode === 'move'){
+      newOffset = dragCtx.origOffset + deltaDays;
+    } else if(dragCtx.mode === 'resize-left'){
+      newOffset = dragCtx.origOffset + deltaDays;
+      newDuration = dragCtx.origDuration - deltaDays;
+      if(newDuration < 1){ newDuration = 1; newOffset = dragCtx.origOffset + dragCtx.origDuration - 1; }
+    } else if(dragCtx.mode === 'resize-right'){
+      newDuration = dragCtx.origDuration + deltaDays;
+      if(newDuration < 1) newDuration = 1;
+    }
+
+    dragCtx.liveOffset = newOffset;
+    dragCtx.liveDuration = newDuration;
+    dragCtx.barEl.classList.add('dragging');
+    dragCtx.barEl.style.left = (newOffset * ganttCellWidth + 2) + 'px';
+    dragCtx.barEl.style.width = (newDuration * ganttCellWidth - 4) + 'px';
+  }
+
+  function onBarMouseUp(){
+    document.removeEventListener('mousemove', onBarMouseMove);
+    document.removeEventListener('mouseup', onBarMouseUp);
+    document.body.style.userSelect = '';
+    if(!dragCtx) return;
+
+    if(dragCtx.moved){
+      const proj = getSelectedProject();
+      const task = proj && proj.tasks.find(t => t.id === dragCtx.taskId);
+      if(task){
+        const newStart = addDays(ganttMinD, dragCtx.liveOffset);
+        const newEnd = addDays(newStart, dragCtx.liveDuration - 1);
+        task.start = fmtDate(newStart);
+        task.end = fmtDate(newEnd);
+        saveState();
+      }
+      renderGantt();
+      renderSidebar();
+    } else {
+      // No real drag happened — treat it as a click to open the edit modal
+      openTaskEditModal(dragCtx.taskId);
+    }
+    dragCtx = null;
+  }
+
+  // ---------- Task edit modal ----------
+
+  function openTaskEditModal(taskId){
+    const proj = getSelectedProject();
+    const task = proj && proj.tasks.find(t => t.id === taskId);
+    if(!task) return;
+    editingTaskId = taskId;
+    editTaskColor = task.color;
+    document.getElementById('task-modal-name').value = task.name;
+    document.getElementById('task-modal-owner').value = task.owner || '';
+    document.getElementById('task-modal-start').value = task.start;
+    document.getElementById('task-modal-end').value = task.end;
+    document.getElementById('task-modal-note').value = task.note || '';
+    renderColorPicker(document.getElementById('task-modal-color-picker'), editTaskColor, (name) => { editTaskColor = name; });
+    document.getElementById('task-modal-overlay').classList.add('show');
+  }
+
+  function saveTaskEdit(){
+    const proj = getSelectedProject();
+    const task = proj && proj.tasks.find(t => t.id === editingTaskId);
+    if(!task) return;
+    const name = document.getElementById('task-modal-name').value.trim();
+    const owner = document.getElementById('task-modal-owner').value.trim();
+    const start = document.getElementById('task-modal-start').value;
+    const end = document.getElementById('task-modal-end').value;
+    const note = document.getElementById('task-modal-note').value.trim();
+    if(!name){ alert('请输入事项名称'); return; }
+    if(!start || !end){ alert('请选择开始和结束日期'); return; }
+    if(parseDate(end) < parseDate(start)){ alert('结束日期不能早于开始日期'); return; }
+    task.name = name;
+    task.owner = owner;
+    task.start = start;
+    task.end = end;
+    task.note = note;
+    task.color = editTaskColor;
+    document.getElementById('task-modal-overlay').classList.remove('show');
+    saveState();
+    renderSidebar();
+    renderGantt();
+  }
+
+  function deleteTaskFromModal(){
+    const proj = getSelectedProject();
+    if(!proj || !editingTaskId) return;
+    proj.tasks = proj.tasks.filter(t => t.id !== editingTaskId);
+    document.getElementById('task-modal-overlay').classList.remove('show');
+    saveState();
+    renderSidebar();
+    renderGantt();
+  }
+
+  function renderGantt(){
+    const proj = getSelectedProject();
+    const emptyState = document.getElementById('empty-state');
+    const table = document.getElementById('gantt-table');
+    const formWrap = document.getElementById('task-form-wrap');
+    const excelSection = document.getElementById('excel-section');
+
+    if(!proj){
+      emptyState.style.display = 'flex';
+      emptyState.querySelector('h3').textContent = '还没有项目';
+      emptyState.querySelector('p').textContent = '点击左侧"新建项目"，开始创建你的第一个甘特图';
+      table.style.display = 'none';
+      formWrap.style.display = 'none';
+      excelSection.style.display = 'none';
+      return;
+    }
+    formWrap.style.display = 'block';
+
+    if(proj.tasks.length === 0){
+      emptyState.style.display = 'flex';
+      emptyState.querySelector('h3').textContent = '还没有事项';
+      emptyState.querySelector('p').textContent = '在上方填写名称和日期，添加第一个事项，开始生成甘特图吧';
+      table.style.display = 'none';
+      excelSection.style.display = 'none';
+      return;
+    }
+    emptyState.style.display = 'none';
+    table.style.display = 'inline-block';
+    excelSection.style.display = 'block';
+
+    // Compute date range with padding
+    let minD = null, maxD = null;
+    proj.tasks.forEach(t => {
+      const s = parseDate(t.start), e = parseDate(t.end);
+      if(!minD || s < minD) minD = s;
+      if(!maxD || e > maxD) maxD = e;
+    });
+    minD = addDays(minD, -2);
+    maxD = addDays(maxD, 2);
+    const totalDays = dayDiff(minD, maxD) + 1;
+    const scaleCfg = SCALE_CONFIG[state.scale] || SCALE_CONFIG.day;
+    const cellWidth = scaleCfg.cellWidth;
+
+    const nameW = state.nameColWidth;
+    const rowCols = [`${nameW}px`];
+    if(state.showOwner) rowCols.push(`${OWNER_W}px`);
+    rowCols.push('1fr');
+    if(state.showNote) rowCols.push(`${NOTE_W}px`);
+    const rowTemplate = rowCols.join(' ');
+    const ownerLeftStyle = state.showOwner ? ` style="left:${nameW}px;"` : '';
+    const stickyWidth = nameW + (state.showOwner ? OWNER_W : 0);
+
+    let html = '';
+
+    // Header row: month band + day cells
+    html += `<div class="gantt-row-frame header-row" style="grid-template-columns:${rowTemplate};">`;
+    html += `<div class="gantt-label-cell">事项</div>`;
+    if(state.showOwner) html += `<div class="gantt-owner-cell"${ownerLeftStyle}>负责人</div>`;
+    html += `<div class="day-track" style="grid-template-columns: repeat(${totalDays}, ${cellWidth}px); height:50px;">`;
+    // month bands as absolutely simple: put month label on first day of each month
+    for(let i=0;i<totalDays;i++){
+      const d = addDays(minD, i);
+      const isWeekend = (d.getDay() === 0 || d.getDay() === 6);
+      const showMonth = (d.getDate() === 1 || i === 0);
+      const isWeekStart = (d.getDay() === 1 || i === 0);
+      let innerLabel = '';
+      if(scaleCfg.showDayNumber){
+        innerLabel = `<div>${d.getDate()}</div><div class="dow">${DOW_NAMES[d.getDay()]}</div>`;
+      } else if(scaleCfg.weekStartLabel && isWeekStart){
+        innerLabel = `<div class="week-label">${d.getMonth()+1}/${d.getDate()}</div>`;
+      }
+      html += `<div class="day-header-cell ${isWeekend?'weekend':''}" style="grid-column:${i+1};">
+        ${showMonth ? `<div class="month-band">${MONTH_NAMES[d.getMonth()]}</div>` : ''}
+        ${innerLabel}
+      </div>`;
+    }
+    html += `</div>`;
+    if(state.showNote) html += `<div class="gantt-note-cell">备注</div>`;
+    html += `</div>`;
+
+    // Task rows
+    ganttCellWidth = cellWidth;
+    ganttMinD = minD;
+    proj.tasks.forEach(t => {
+      const s = parseDate(t.start), e = parseDate(t.end);
+      const offset = dayDiff(minD, s);
+      const duration = dayDiff(s, e) + 1;
+      const c = macaronOf(t.color);
+      const barWidth = Math.max(duration * cellWidth - 4, 6);
+      html += `<div class="gantt-row-frame task-row" data-task-id="${t.id}" draggable="true" style="grid-template-columns:${rowTemplate};">`;
+      html += `<div class="gantt-label-cell">
+        <span class="row-grip" title="拖动调整顺序">⋮⋮</span>
+        <div class="task-row-label" data-open-task="${t.id}" title="点击可编辑事项">${escapeHtml(t.name)}</div>
+        <button class="task-edit-btn" data-edit-task="${t.id}" title="编辑事项">✎</button>
+        <button class="task-del-btn" data-del-task="${t.id}" title="删除事项">✕</button>
+      </div>`;
+      if(state.showOwner) html += `<div class="gantt-owner-cell"${ownerLeftStyle} title="${escapeHtml(t.owner || '')}">${escapeHtml(t.owner || '')}</div>`;
+      html += `<div class="day-track" style="grid-template-columns: repeat(${totalDays}, ${cellWidth}px);">`;
+      for(let i=0;i<totalDays;i++){
+        const d = addDays(minD, i);
+        const isWeekend = (d.getDay() === 0 || d.getDay() === 6);
+        html += `<div class="day-cell-bg ${isWeekend?'weekend':''}" style="grid-column:${i+1};"></div>`;
+      }
+      html += `<div class="macaron-bar" data-task-id="${t.id}" data-offset="${offset}" data-duration="${duration}" style="left:${offset*cellWidth+2}px; width:${barWidth}px; --bar-top:${c.top}; --bar-bottom:${c.bottom};" title="${escapeHtml(t.name)}: ${t.start} ~ ${t.end}${t.owner ? ' | 负责人：'+escapeHtml(t.owner) : ''}${t.note ? ' | 备注：'+escapeHtml(t.note) : ''}">
+        <div class="bar-handle bar-handle-left"></div>
+        <div class="filling-line"></div>
+        <div class="bar-handle bar-handle-right"></div>
+      </div>`;
+      html += `</div>`;
+      if(state.showNote) html += `<div class="gantt-note-cell" title="${escapeHtml(t.note || '')}">${escapeHtml(t.note || '')}</div>`;
+      html += `</div>`;
+    });
+
+    const totalTableHeight = 50 + proj.tasks.length * 52;
+    html += `<div id="col-resize-handle" style="left:${stickyWidth}px; height:${totalTableHeight}px;"></div>`;
+
+    table.innerHTML = html;
+
+    table.querySelectorAll('[data-del-task]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tid = btn.getAttribute('data-del-task');
+        proj.tasks = proj.tasks.filter(x => x.id !== tid);
+        saveState();
+        renderGantt();
+        renderSidebar();
+      });
+    });
+
+    table.querySelectorAll('[data-edit-task]').forEach(btn => {
+      btn.addEventListener('click', () => openTaskEditModal(btn.getAttribute('data-edit-task')));
+    });
+    table.querySelectorAll('[data-open-task]').forEach(label => {
+      label.addEventListener('click', () => openTaskEditModal(label.getAttribute('data-open-task')));
+    });
+    table.querySelectorAll('.macaron-bar').forEach(bar => {
+      bar.addEventListener('mousedown', onBarMouseDown);
+    });
+    attachRowDragHandlers(table);
+    attachColResizeHandler();
+
+    renderExcelTable(proj);
+  }
+
+  // ---------- Column resize (name column width) ----------
+
+  let colResizeCtx = null;
+
+  function attachColResizeHandler(){
+    const handle = document.getElementById('col-resize-handle');
+    if(!handle) return;
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      colResizeCtx = { startX: e.clientX, startWidth: state.nameColWidth };
+      handle.classList.add('resizing');
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onColResizeMove);
+      document.addEventListener('mouseup', onColResizeUp);
+    });
+  }
+
+  function onColResizeMove(e){
+    if(!colResizeCtx) return;
+    const delta = e.clientX - colResizeCtx.startX;
+    let newWidth = colResizeCtx.startWidth + delta;
+    newWidth = Math.max(NAME_W_MIN, Math.min(NAME_W_MAX, newWidth));
+    state.nameColWidth = newWidth;
+
+    const cols = [`${newWidth}px`];
+    if(state.showOwner) cols.push(`${OWNER_W}px`);
+    cols.push('1fr');
+    if(state.showNote) cols.push(`${NOTE_W}px`);
+    const template = cols.join(' ');
+
+    document.querySelectorAll('.gantt-row-frame').forEach(row => { row.style.gridTemplateColumns = template; });
+    if(state.showOwner){
+      document.querySelectorAll('.gantt-owner-cell').forEach(cell => { cell.style.left = newWidth + 'px'; });
+    }
+    const handle = document.getElementById('col-resize-handle');
+    if(handle){
+      handle.style.left = (newWidth + (state.showOwner ? OWNER_W : 0)) + 'px';
+    }
+  }
+
+  function onColResizeUp(){
+    document.removeEventListener('mousemove', onColResizeMove);
+    document.removeEventListener('mouseup', onColResizeUp);
+    document.body.style.userSelect = '';
+    const handle = document.getElementById('col-resize-handle');
+    if(handle) handle.classList.remove('resizing');
+    if(colResizeCtx) saveState();
+    colResizeCtx = null;
+  }
+
+  // ---------- Row drag-to-reorder ----------
+
+  let dragRowTaskId = null;
+
+  function attachRowDragHandlers(table){
+    table.querySelectorAll('.task-row').forEach(row => {
+      row.addEventListener('dragstart', (e) => {
+        dragRowTaskId = row.getAttribute('data-task-id');
+        row.classList.add('row-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try{ e.dataTransfer.setData('text/plain', dragRowTaskId); }catch(err){ /* Safari needs setData to allow drag */ }
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('row-dragging');
+        table.querySelectorAll('.task-row').forEach(r => r.classList.remove('row-drop-before', 'row-drop-after'));
+        dragRowTaskId = null;
+      });
+      row.addEventListener('dragover', (e) => {
+        if(!dragRowTaskId) return;
+        e.preventDefault();
+        const targetId = row.getAttribute('data-task-id');
+        if(targetId === dragRowTaskId) return;
+        const rect = row.getBoundingClientRect();
+        const isAfter = (e.clientY - rect.top) > rect.height / 2;
+        table.querySelectorAll('.task-row').forEach(r => r.classList.remove('row-drop-before', 'row-drop-after'));
+        row.classList.add(isAfter ? 'row-drop-after' : 'row-drop-before');
+      });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const targetId = row.getAttribute('data-task-id');
+        if(!dragRowTaskId || dragRowTaskId === targetId) return;
+        const proj = getSelectedProject();
+        if(!proj) return;
+        const fromIdx = proj.tasks.findIndex(t => t.id === dragRowTaskId);
+        if(fromIdx === -1) return;
+        const rect = row.getBoundingClientRect();
+        const isAfter = (e.clientY - rect.top) > rect.height / 2;
+        const [moved] = proj.tasks.splice(fromIdx, 1);
+        let toIdx = proj.tasks.findIndex(t => t.id === targetId);
+        if(toIdx === -1) toIdx = proj.tasks.length;
+        proj.tasks.splice(isAfter ? toIdx + 1 : toIdx, 0, moved);
+        saveState();
+        renderGantt();
+      });
+    });
+  }
+
+  function renderExcelTable(proj){
+    const wrap = document.getElementById('excel-table-wrap');
+    let html = '<table class="excel-table"><thead><tr>';
+    html += '<th>事项</th>';
+    if(state.showOwner) html += '<th>负责人</th>';
+    html += '<th>开始日期</th><th>结束日期</th>';
+    if(state.showNote) html += '<th>备注</th>';
+    html += '</tr></thead><tbody>';
+
+    proj.tasks.forEach(t => {
+      const c = macaronOf(t.color);
+      html += '<tr>';
+      html += `<td class="excel-name-cell" style="border-left-color:${c.bottom};">${escapeHtml(t.name)}</td>`;
+      if(state.showOwner) html += `<td>${escapeHtml(t.owner || '')}</td>`;
+      html += `<td><input type="date" class="excel-date-input" data-task-id="${t.id}" data-field="start" value="${t.start}"></td>`;
+      html += `<td><input type="date" class="excel-date-input" data-task-id="${t.id}" data-field="end" value="${t.end}"></td>`;
+      if(state.showNote) html += `<td>${escapeHtml(t.note || '')}</td>`;
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('.excel-date-input').forEach(input => {
+      input.addEventListener('change', onExcelDateChange);
+    });
+  }
+
+  function onExcelDateChange(e){
+    const input = e.target;
+    const taskId = input.getAttribute('data-task-id');
+    const field = input.getAttribute('data-field');
+    const proj = getSelectedProject();
+    const task = proj && proj.tasks.find(t => t.id === taskId);
+    if(!task) return;
+
+    const newValue = input.value;
+    if(!newValue){ input.value = task[field]; return; }
+
+    if(field === 'start' && parseDate(newValue) > parseDate(task.end)){
+      alert('开始日期不能晚于结束日期');
+      input.value = task.start;
+      return;
+    }
+    if(field === 'end' && parseDate(newValue) < parseDate(task.start)){
+      alert('结束日期不能早于开始日期');
+      input.value = task.end;
+      return;
+    }
+
+    task[field] = newValue;
+    saveState();
+    renderGantt();
+    renderSidebar();
+  }
+
+  function exportExcel(){
+    const proj = getSelectedProject();
+    if(!proj || proj.tasks.length === 0){ alert('当前项目还没有事项，无法导出'); return; }
+    if(typeof XLSX === 'undefined'){ alert('导出组件加载失败，请检查网络后重试'); return; }
+
+    const rows = proj.tasks.map(t => {
+      const row = { '事项': t.name };
+      if(state.showOwner) row['负责人'] = t.owner || '';
+      row['开始日期'] = t.start;
+      row['结束日期'] = t.end;
+      if(state.showNote) row['备注'] = t.note || '';
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '项目管理表');
+    XLSX.writeFile(wb, `${proj.name}-项目管理表.xlsx`);
+  }
+
+  // ---------- Excel import ----------
+
+  function matchHeader(headers, aliases){
+    const normalized = headers.map(h => String(h).trim().toLowerCase());
+    for(const alias of aliases){
+      const idx = normalized.indexOf(alias.toLowerCase());
+      if(idx !== -1) return headers[idx];
+    }
+    return null;
+  }
+
+  function parseFlexibleDate(value){
+    if(value === undefined || value === null || value === '') return null;
+    if(typeof value === 'number'){
+      // Excel serial date (days since 1899-12-30)
+      const ms = Math.round((value - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      return isNaN(d.getTime()) ? null : fmtDate(d);
+    }
+    const str = String(value).trim();
+    let m = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+    if(m){
+      const d = new Date(+m[1], +m[2]-1, +m[3]);
+      if(!isNaN(d.getTime())) return fmtDate(d);
+    }
+    m = str.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+    if(m){
+      const d = new Date(+m[3], +m[1]-1, +m[2]);
+      if(!isNaN(d.getTime())) return fmtDate(d);
+    }
+    const generic = new Date(str);
+    return isNaN(generic.getTime()) ? null : fmtDate(generic);
+  }
+
+  function handleExcelFile(file){
+    const proj = getSelectedProject();
+    if(!proj){ alert('请先选择或新建一个项目'); return; }
+    if(typeof XLSX === 'undefined'){ alert('导入组件加载失败，请检查网络后重试'); return; }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try{
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type:'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval:'', raw:false });
+        if(!rows.length){ alert('表格中没有可导入的数据'); return; }
+
+        const headers = Object.keys(rows[0]);
+        const nameKey = matchHeader(headers, ['事项','事项名称','任务','任务名称','名称','name','task']);
+        const ownerKey = matchHeader(headers, ['负责人','负责人员','owner','responsible']);
+        const startKey = matchHeader(headers, ['开始日期','开始时间','start','start date','startdate']);
+        const endKey = matchHeader(headers, ['结束日期','结束时间','end','end date','enddate']);
+        const noteKey = matchHeader(headers, ['备注','说明','note','remark','remarks']);
+
+        if(!nameKey || !startKey || !endKey){
+          alert('无法识别表格列，请确认表格包含"事项""开始日期""结束日期"这些列标题');
+          return;
+        }
+
+        const pal = currentPalette();
+        let imported = 0, skipped = 0;
+        rows.forEach(row => {
+          const name = String(row[nameKey] || '').trim();
+          const start = parseFlexibleDate(row[startKey]);
+          const end = parseFlexibleDate(row[endKey]);
+          if(!name || !start || !end || parseDate(end) < parseDate(start)){ skipped++; return; }
+          const owner = ownerKey ? String(row[ownerKey] || '').trim() : '';
+          const note = noteKey ? String(row[noteKey] || '').trim() : '';
+          const color = pal[(proj.tasks.length) % pal.length].name;
+          proj.tasks.push({ id: uid(), name, start, end, color, owner, note });
+          imported++;
+        });
+
+        if(imported === 0){
+          alert('没有成功导入任何事项，请检查日期格式是否类似 2026-01-01');
+          return;
+        }
+        saveState();
+        renderSidebar();
+        renderGantt();
+        alert(`成功导入 ${imported} 条事项${skipped ? '，跳过 ' + skipped + ' 条格式不正确的行' : ''}`);
+      }catch(err){
+        console.error(err);
+        alert('导入失败，请确认文件是 Excel（.xlsx/.xls）或 CSV 格式');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function renderAll(){
+    document.getElementById('toggle-owner').checked = state.showOwner;
+    document.getElementById('toggle-note').checked = state.showNote;
+    document.querySelectorAll('.scale-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-scale') === state.scale);
+    });
+    renderSidebar();
+    renderHeader();
+    renderTaskFormColors();
+    renderGantt();
+  }
+
+  // ---------- Events ----------
+
+  document.getElementById('project-title').addEventListener('blur', (e) => {
+    const proj = getSelectedProject();
+    if(!proj) return;
+    const val = e.target.textContent.trim();
+    if(val){
+      proj.name = val;
+      saveState();
+      renderSidebar();
+    } else {
+      e.target.textContent = proj.name;
+    }
+  });
+  document.getElementById('project-title').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); }
+  });
+
+  document.getElementById('add-task-btn').addEventListener('click', () => {
+    const proj = getSelectedProject();
+    if(!proj){ alert('请先创建一个项目'); return; }
+    const nameInput = document.getElementById('task-name-input');
+    const ownerInput = document.getElementById('task-owner-input');
+    const startInput = document.getElementById('task-start-input');
+    const endInput = document.getElementById('task-end-input');
+    const noteInput = document.getElementById('task-note-input');
+    const name = nameInput.value.trim();
+    const owner = ownerInput.value.trim();
+    const start = startInput.value;
+    const end = endInput.value;
+    const note = noteInput.value.trim();
+    if(!name){ alert('请输入事项名称'); nameInput.focus(); return; }
+    if(!start || !end){ alert('请选择开始和结束日期'); return; }
+    if(parseDate(end) < parseDate(start)){ alert('结束日期不能早于开始日期'); return; }
+
+    proj.tasks.push({ id: uid(), name, start, end, color: newTaskColor, owner, note });
+    nameInput.value = '';
+    ownerInput.value = '';
+    noteInput.value = '';
+    saveState();
+    renderSidebar();
+    renderGantt();
+  });
+
+  document.getElementById('task-name-input').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') document.getElementById('add-task-btn').click();
+  });
+
+  document.getElementById('toggle-owner').addEventListener('change', (e) => {
+    state.showOwner = e.target.checked;
+    saveState();
+    renderGantt();
+  });
+  document.getElementById('toggle-note').addEventListener('change', (e) => {
+    state.showNote = e.target.checked;
+    saveState();
+    renderGantt();
+  });
+
+  document.getElementById('export-data-btn').addEventListener('click', downloadBackup);
+  document.getElementById('import-data-btn').addEventListener('click', () => {
+    document.getElementById('import-data-file').click();
+  });
+  document.getElementById('import-data-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(file) importBackupFromFile(file);
+    e.target.value = '';
+  });
+
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.theme = btn.getAttribute('data-theme-btn');
+      applyTheme();
+      saveState();
+      renderTaskFormColors();
+      renderSidebar();
+      renderGantt();
+    });
+  });
+
+  document.querySelectorAll('.scale-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.scale = btn.getAttribute('data-scale');
+      document.querySelectorAll('.scale-btn').forEach(b => b.classList.toggle('active', b === btn));
+      saveState();
+      renderGantt();
+    });
+  });
+
+  document.querySelectorAll('.fontsize-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.fontSize = btn.getAttribute('data-fontsize-btn');
+      applyFontSize();
+      saveState();
+    });
+  });
+
+  document.getElementById('export-excel-btn').addEventListener('click', exportExcel);
+  document.getElementById('import-excel-btn').addEventListener('click', () => {
+    document.getElementById('import-excel-file').click();
+  });
+  document.getElementById('import-excel-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(file) handleExcelFile(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('export-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('export-menu').classList.toggle('show');
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('export-menu').classList.remove('show');
+  });
+  document.querySelectorAll('#export-menu button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('export-menu').classList.remove('show');
+      exportImage(btn.getAttribute('data-export'));
+    });
+  });
+
+  function exportImage(type){
+    const proj = getSelectedProject();
+    if(!proj || proj.tasks.length === 0){ alert('当前项目还没有事项，无法导出'); return; }
+    if(typeof html2canvas === 'undefined'){ alert('导出组件加载失败，请检查网络后重试'); return; }
+
+    const source = document.getElementById('gantt-table');
+    const cjkFont = "'Quicksand','PingFang SC','Microsoft YaHei','Hiragino Sans GB','Noto Sans SC',sans-serif";
+    const themeBg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#FFFFFF';
+    const themeHeading = getComputedStyle(document.documentElement).getPropertyValue('--heading').trim() || '#333333';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `position:fixed; left:-99999px; top:0; background:${themeBg}; padding:28px 32px; display:inline-block; font-family:${cjkFont};`;
+
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = `font-family:${cjkFont}; font-size:22px; font-weight:600; color:${themeHeading}; margin-bottom:16px;`;
+    titleEl.textContent = proj.name;
+    wrapper.appendChild(titleEl);
+
+    const clone = source.cloneNode(true);
+    clone.style.display = 'inline-block';
+    // sticky positioning has no meaning once un-scrolled; keep static so the clone lays out normally
+    clone.querySelectorAll('.gantt-label-cell, .gantt-owner-cell, .gantt-note-cell').forEach(el => {
+      el.style.position = 'static';
+    });
+    wrapper.appendChild(clone);
+
+    document.body.appendChild(wrapper);
+
+    html2canvas(wrapper, { backgroundColor: themeBg, scale:2, useCORS:true }).then(canvas => {
+      document.body.removeChild(wrapper);
+      const mime = type === 'jpg' ? 'image/jpeg' : 'image/png';
+      const dataUrl = canvas.toDataURL(mime, 0.95);
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${proj.name}-甘特图.${type === 'jpg' ? 'jpg' : 'png'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }).catch(err => {
+      if(wrapper.parentNode) document.body.removeChild(wrapper);
+      console.error(err);
+      alert('导出失败，请重试');
+    });
+  }
+
+  document.getElementById('add-project-btn').addEventListener('click', () => {
+    newProjectColor = currentPalette()[state.projects.length % currentPalette().length].name;
+    document.getElementById('modal-project-name').value = '';
+    renderColorPicker(document.getElementById('modal-color-picker'), newProjectColor, (name) => { newProjectColor = name; });
+    document.getElementById('modal-overlay').classList.add('show');
+    setTimeout(() => document.getElementById('modal-project-name').focus(), 50);
+  });
+
+  document.getElementById('modal-cancel').addEventListener('click', () => {
+    document.getElementById('modal-overlay').classList.remove('show');
+  });
+  document.getElementById('modal-overlay').addEventListener('click', (e) => {
+    if(e.target.id === 'modal-overlay') document.getElementById('modal-overlay').classList.remove('show');
+  });
+  document.getElementById('modal-confirm').addEventListener('click', createProject);
+  document.getElementById('modal-project-name').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') createProject();
+  });
+
+  document.getElementById('task-modal-cancel').addEventListener('click', () => {
+    document.getElementById('task-modal-overlay').classList.remove('show');
+  });
+  document.getElementById('task-modal-overlay').addEventListener('click', (e) => {
+    if(e.target.id === 'task-modal-overlay') document.getElementById('task-modal-overlay').classList.remove('show');
+  });
+  document.getElementById('task-modal-save').addEventListener('click', saveTaskEdit);
+  document.getElementById('task-modal-delete').addEventListener('click', () => {
+    if(confirm('确定删除这个事项吗？')) deleteTaskFromModal();
+  });
+
+  function createProject(){
+    const nameInput = document.getElementById('modal-project-name');
+    const name = nameInput.value.trim();
+    if(!name){ nameInput.focus(); return; }
+    const p = { id: uid(), name, color: newProjectColor, tasks: [] };
+    state.projects.push(p);
+    state.selectedId = p.id;
+    document.getElementById('modal-overlay').classList.remove('show');
+    saveState();
+    renderAll();
+  }
+
+  // ---------- Init ----------
+  async function init(){
+    await loadState();
+    if(state.projects.length === 0){
+      const p = { id: uid(), name: '示例项目', color: 'rose', tasks: [
+        { id: uid(), name: '需求调研', start: fmtDate(new Date()), end: fmtDate(addDays(new Date(),4)), color:'rose', owner:'小美', note:'' },
+        { id: uid(), name: '设计方案', start: fmtDate(addDays(new Date(),3)), end: fmtDate(addDays(new Date(),8)), color:'lavender', owner:'小林', note:'待评审' },
+        { id: uid(), name: '开发实现', start: fmtDate(addDays(new Date(),7)), end: fmtDate(addDays(new Date(),16)), color:'sky', owner:'小林', note:'' },
+        { id: uid(), name: '测试验收', start: fmtDate(addDays(new Date(),15)), end: fmtDate(addDays(new Date(),19)), color:'pistachio', owner:'小美', note:'需客户确认' },
+      ]};
+      state.projects.push(p);
+      state.selectedId = p.id;
+      saveState();
+    }
+    const today = fmtDate(new Date());
+    document.getElementById('task-start-input').value = today;
+    document.getElementById('task-end-input').value = today;
+    applyTheme();
+    applyFontSize();
+    renderAll();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
